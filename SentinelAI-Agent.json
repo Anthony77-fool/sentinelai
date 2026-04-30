@@ -1,0 +1,731 @@
+{
+  "name": "SentinelAI-Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        944,
+        288
+      ],
+      "id": "8ef4e720-c7a7-44b7-ab79-cbf91bfe8a72",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "c0mQvqvt71aCOhsT",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "28f76eaa-3d9c-4751-8abc-92b69fa2ff61",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -80,
+        -48
+      ],
+      "id": "8c45d13e-9d97-438e-9d16-338891ffd885",
+      "name": "Trigger Entry Webhook",
+      "webhookId": "28f76eaa-3d9c-4751-8abc-92b69fa2ff61"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "424aa15c-5b09-405c-a136-67819a1fa062",
+              "name": "{{ $json.body.rules }}",
+              "value": "rules_text",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        -240
+      ],
+      "id": "f00ac7f6-f467-4992-83f4-ee3ed56efcad",
+      "name": "Get Text Rules (json)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\": \"Sentinel rules updated successfully\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1216,
+        -240
+      ],
+      "id": "d819c6b9-534f-4888-83bb-255d845482fc",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Try to find the rules in common locations (body or top level)\nconst rawData = $json.rules || ($json.body && $json.body.rules);\n\n// 2. Initialize the string\nlet ruleString = \"SENTINEL AI: UPDATED PRIVACY RULES\\n\";\nruleString += \"====================================\\n\";\n\n// 3. Check if rawData actually has content\nif (!rawData) {\n    ruleString += \"ERROR: No rules data was received from the previous node.\";\n} else if (typeof rawData === 'string') {\n    ruleString += rawData;\n} else {\n    // Loop through object keys\n    for (const key in rawData) {\n        if (key !== 'type') { \n            ruleString += `- ${key}: ${rawData[key]}\\n`;\n        }\n    }\n}\n\n// 4. Return it as rules_text\nreturn { \n  rules_text: ruleString,\n  update_time: new Date().toLocaleString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -240
+      ],
+      "id": "afa59376-a456-454c-bb30-94215de57a42",
+      "name": "Transform JSON into Text"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        -240
+      ],
+      "id": "0e7abe89-8440-41a3-9a51-13ffc891a35c",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.type }}",
+                    "rightValue": "rules",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "eadf8f0e-9eca-4bed-8ce3-ba8ca5551bdd"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "69a6ecda-6526-4300-aa35-ba25f571aa68",
+                    "leftValue": "={{ $json.body.type }}",
+                    "rightValue": "validate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        -48
+      ],
+      "id": "c0b6cfbe-9d1b-4f61-9eeb-20ccc6ad344e",
+      "name": "Switch (type == 'rules' ? validator-rules: validator-ai)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n{\n  \"type\": $('Switch (isPenalize == is empty ? chatbot : sanitizer)').item.json.type,\n  \"chatInput\": $('Switch (isPenalize == is empty ? chatbot : sanitizer)').item.json.chatInput,\n  \"isPenalice\": $('Switch (isPenalize == is empty ? chatbot : sanitizer)').item.json.isPenalice,\n  \"penaliceTitles\": $('Switch (isPenalize == is empty ? chatbot : sanitizer)').item.json.penaliceTitles,\n  \"ai_response\": $json.text\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1824,
+        608
+      ],
+      "id": "6433948e-28e6-49ff-88e1-940c2aa591b4",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "rules_text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        80
+      ],
+      "id": "fcc0b0de-1b82-456e-bafa-ee7981f5d915",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/node/.n8n/company_rules.txt",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        -240
+      ],
+      "id": "3530a4ad-2db9-4e8b-bcce-e88dbfa67665",
+      "name": "Write Text and stored to Disk",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n/company_rules.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        80
+      ],
+      "id": "4a9aa5e9-8ce1-4add-a425-69669874b434",
+      "name": "Read Files from Disk"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User Input: {{ $json.chatInput }}\nRules to Follow: {{ $json.rules_context }}\n\nRespond using this JSON structure:\n{\n  \"type\": \"{{ $json.body.type }}\",\n  \"chatInput\": \"{{ $json.chatInput }}\",\n  \"rules_context\": \"{{ $json.rules_context }}\",\n  \"isPenalice\": boolean,\n  \"penaliceTitles\": [\"Title 1\", \"Title 2\"] or null\n}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a strict security validator for SentinelAI. Your task is to analyze the chatInput based on the provided rules_context.  Logic:  Check if chatInput violates any rule in rules_context.  If it violates a rule: set isPenalice to true and list the specific rule titles in penaliceTitles.  If it is safe: set isPenalice to false and penaliceTitles to null.  Always return the original chatInput regardless of the result.  Output Format: You MUST respond in valid JSON format only."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        944,
+        80
+      ],
+      "id": "e868f86b-9724-4c98-9305-f04c3f3a6e41",
+      "name": "Agent for Validation"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d8fcb97e-2b28-4464-9ca6-1824605e3722",
+              "name": "chatInput",
+              "value": "={{ $node[\"Trigger Entry Webhook\"].json.body.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "1beb8681-4a6a-47fd-8486-9c15fa872e60",
+              "name": "rules_context",
+              "value": "={{ $node[\"Extract from File\"].json.rules_text }}",
+              "type": "string"
+            },
+            {
+              "id": "542b47f0-cff6-484e-bed3-50a755073050",
+              "name": "body.type",
+              "value": "={{ $('Switch (type == \\'rules\\' ? validator-rules: validator-ai)').item.json.body.type }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        80
+      ],
+      "id": "446f28ff-8b97-4230-a0d5-ecdf4fe79e30",
+      "name": "Combine Fields"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Get ORIGINAL INPUT (Reaching back to the Webhook node)\n// This ensures 'type', 'chatInput', and 'rules_context' are preserved\nconst originalInput = $('Trigger Entry Webhook').item.json.body;\n\n// 2. Get the raw response from the Agent for Validation\nconst rawText = $('Agent for Validation').item.json.output || \n                $('Agent for Validation').item.json.text || \"\";\n\n// 3. Clean and Parse\ntry {\n  const cleanJson = rawText.replace(/```json|```/g, \"\").trim();\n  const parsed = JSON.parse(cleanJson);\n  \n  // 4. RETURN EVERYTHING (The Complete JSON)\n  return {\n    type: originalInput.type,\n    chatInput: originalInput.chatInput,\n    rules_context: originalInput.rules_context, // Keeping this as requested\n    isPenalice: parsed.isPenalice,\n    penaliceTitles: parsed.penaliceTitles || []\n  };\n\n} catch (e) {\n  // If AI output is unreadable, we still return the full structure to prevent crashes\n  return {\n    type: originalInput.type,\n    chatInput: originalInput.chatInput,\n    rules_context: originalInput.rules_context,\n    isPenalice: true, \n    penaliceTitles: [\"JSON_PARSE_ERROR\"]\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        80
+      ],
+      "id": "bf9e379d-9d79-4c2c-9189-5579a9283737",
+      "name": "Compile all LLM responses into JSON reponse"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1456,
+        800
+      ],
+      "id": "49f5c438-7ae6-43da-9f37-5f8ec489b5e5",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "c0mQvqvt71aCOhsT",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User Input: {{ $json.chatInput }}\n\nPlease provide a helpful response to the input above.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1472,
+        608
+      ],
+      "id": "c70165dd-fd61-4b05-89d3-8fe418b108d2",
+      "name": "LLM Chatbot"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d8b7841c-9d7f-40aa-b154-c4c67c074864",
+                    "leftValue": "={{ $json.isPenalice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Sanitizer"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2d28cec8-b968-4685-89e9-8936eca0fc49",
+                    "leftValue": "={{ $json.isPenalice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Chatbot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        368
+      ],
+      "id": "b56d1a9b-3b56-4f71-a7ed-d50b187c5102",
+      "name": "Switch (isPenalize == is empty ? chatbot : sanitizer)"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        416
+      ],
+      "id": "3eeed7f9-9883-4104-9a54-02e43940a491",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "c0mQvqvt71aCOhsT",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Compile all LLM responses into JSON reponse').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=That looks much better, but you have a small \"logic loop\" error at the bottom. Since you are asking the Sanitizer to redact specifically based on the rules found by your validator, you need to make sure the AI knows those rules are the \"Target List.\"\n\nThe \"Final Boss\" Version of the Instructions\nReplace your current text with this. It cleans up the duplication and gives the AI a very clear path:\n\nSTRICT TASK: Rewrite the \"Current Input\" below.\n\nREDACTION RULES: > 1. You must replace any personal identifiers (Names, Phones, Addresses) with these exact placeholders: {{your_name}}, {{phone_number}}, or {{location}}.\n2. CRITICAL: Do not leave the space blank. You MUST use the double-bracket placeholders.\n3. Refer to these detected violation categories for guidance: {{ $('Compile all LLM responses into JSON reponse').item.json.penaliceTitles }}\n\nCONSTRAINTS:\n\nDO NOT answer questions.\n\nDO NOT provide advice.\n\nONLY output the rewritten text.\n\nCurrent Input: {{ $json.chatInput }}\n\nRedact based on these rules: {{ $('Compile all LLM responses into JSON reponse').item.json.penaliceTitles }} {{ $('Compile all LLM responses into JSON reponse').item.json.penaliceTitles }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1536,
+        224
+      ],
+      "id": "aeef4076-8ec8-471a-9920-1ff9e8c2bb57",
+      "name": "Sanitizer Agent",
+      "notes": "\"You are a Privacy Redaction Engine. You will receive a user message and a set of privacy rules. Your ONLY job is to rewrite the user message so that any information violating the rules is replaced with a placeholder like {{your_name}}, {{address}}, or {{phone_number}}.\n\nExample:\nInput: 'Hello I am Marck, I live in Batac.'\nOutput: 'Hello I am {{your_name}}, I live in {{location}}.'\n\nCRITICAL: Do not answer the question. Only output the rewritten version of the user's text. Maintain the original tone and structure.\"\n\nRedact based on these rules: {{ $('Compile all LLM responses into JSON reponse').item.json.penaliceTitles }}"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User Input: {{ $json.output }}\n\nPlease provide a helpful response to the input above.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1904,
+        224
+      ],
+      "id": "a0aad1a9-6ad5-4f39-805a-89d8a96fd76d",
+      "name": "LLM Chatbot1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1904,
+        400
+      ],
+      "id": "25347ca7-c579-4622-ae3c-28394fd45588",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "c0mQvqvt71aCOhsT",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n{\n  \"type\": $('Compile all LLM responses into JSON reponse').item.json.type,\n  \"chatInput\": $('Compile all LLM responses into JSON reponse').item.json.chatInput,\n  \"isPenalice\": $('Compile all LLM responses into JSON reponse').item.json.isPenalice,\n  \"penaliceTitles\": $('Compile all LLM responses into JSON reponse').item.json.penaliceTitles,\n  \"sanitizerOutput\": $('Sanitizer Agent')?.item?.json?.output || \"No Redaction Needed\",\n  \"ai_response\": $json.text || $json.output\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2256,
+        224
+      ],
+      "id": "5fa100aa-d6e8-4f86-aab4-be1155b0ffd9",
+      "name": "Respond to Webhook2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent for Validation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Entry Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch (type == 'rules' ? validator-rules: validator-ai)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Text Rules (json)": {
+      "main": [
+        [
+          {
+            "node": "Transform JSON into Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform JSON into Text": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Write Text and stored to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch (type == 'rules' ? validator-rules: validator-ai)": {
+      "main": [
+        [
+          {
+            "node": "Get Text Rules (json)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Text and stored to Disk": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Combine Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent for Validation": {
+      "main": [
+        [
+          {
+            "node": "Compile all LLM responses into JSON reponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Fields": {
+      "main": [
+        [
+          {
+            "node": "Agent for Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile all LLM responses into JSON reponse": {
+      "main": [
+        [
+          {
+            "node": "Switch (isPenalize == is empty ? chatbot : sanitizer)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM Chatbot",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch (isPenalize == is empty ? chatbot : sanitizer)": {
+      "main": [
+        [
+          {
+            "node": "Sanitizer Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LLM Chatbot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Chatbot": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Sanitizer Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitizer Agent": {
+      "main": [
+        [
+          {
+            "node": "LLM Chatbot1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM Chatbot1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Chatbot1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6d0dc73d-e0dd-47de-a6d2-3233329bd07b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59aa9343d07d2272e0d505f9a4d5beda3d55ee0a7bff1953262b2c586bb4e702"
+  },
+  "id": "0jeKMvMOOEn10trm",
+  "tags": []
+}
